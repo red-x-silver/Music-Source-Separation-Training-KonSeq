@@ -51,9 +51,15 @@ def read_audio_transposed(path: str, instr: str = None, skip_err: bool = False) 
         else:
             raise RuntimeError(f"Error reading the file at {path}: {e}")
     else:
-        if len(mix.shape) == 1:  # For mono audio
-            mix = np.expand_dims(mix, axis=-1)
-        return mix.T, sr
+        # Convert mono to stereo if needed
+        #print(f"the shape of mix when read: {mix.shape}")
+        if len(mix.shape) == 1:
+            mix = np.stack([mix, mix], axis=0)
+        #print(f"the shape of mix after converting from mono to stereo: {mix.shape}")
+        #if len(mix.shape) == 1:  # For mono audio
+        #    mix = np.expand_dims(mix, axis=-1)
+        #print(f"the shape of mix after converting from mono to stereo: {mix.shape}")
+        return mix, sr
 
 
 def normalize_audio(audio: np.ndarray) -> tuple[np.ndarray, Dict[str, float]]:
@@ -176,7 +182,8 @@ def get_mixture_paths(
 
     all_mixtures_path = []
     for path in valid_path:
-        part = sorted(glob.glob(f"{path}/*/mixture.{extension}"))
+        #part = sorted(glob.glob(f"{path}/*/mixture.{extension}"))
+        part = sorted(glob.glob(f"{path}/*/sum_track_*{extension}"))
         if len(part) == 0:
             if verbose:
                 print(f'No validation data found in: {path}')
@@ -356,6 +363,7 @@ def process_audio_files(
             if config.inference['normalize'] is True:
                 mix, norm_params = normalize_audio(mix)
 
+        #print(f"in valid code: the shape of mix before calling demix(): {mix.shape}")
         waveforms_orig = demix(config, model, mix.copy(), device, model_type=args.model_type)
 
         if use_tta:
@@ -768,12 +776,12 @@ def check_validation(args):
 
     device_ids = args.device_ids
     if torch.cuda.is_available():
-        device = torch.device(f'cuda:{device_ids[0]}')
+        device = f'cuda:{args.device_ids[0]}' if type(device_ids) == list else f'cuda:{device_ids}'
     else:
         device = 'cpu'
         print('CUDA is not available. Run validation on CPU. It will be very slow...')
 
-    if torch.cuda.is_available() and len(device_ids) > 1:
+    if torch.cuda.is_available() and type(device_ids) == list and len(device_ids) > 1:
         valid_multi_gpu(model, args, config, device_ids, verbose=False)
     else:
         valid(model, args, config, device, verbose=True)
