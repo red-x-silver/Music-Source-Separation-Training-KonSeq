@@ -162,7 +162,8 @@ def demix(
         mix: torch.Tensor,
         device: torch.device,
         model_type: str,
-        pbar: bool = False
+        pbar: bool = False,
+        sum_cymbal_channels=True
 ) -> Tuple[List[Dict[str, np.ndarray]], np.ndarray]:
     """
     Unified function for audio source separation with support for multiple processing modes.
@@ -297,6 +298,9 @@ def demix(
         instruments = config.training.instruments
     else:
         instruments = prefer_target_instrument(config)
+
+    if sum_cymbal_channels:
+        estimated_sources[3] = estimated_sources[3] + estimated_sources[4] + estimated_sources[5]
 
     ret_data = {k: v for k, v in zip(instruments, estimated_sources)}
 
